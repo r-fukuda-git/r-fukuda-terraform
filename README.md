@@ -2,6 +2,8 @@
 
 `ap-northeast-1` 向けの Terraform 構成。`bootstrap/` でリモートステート基盤を作成し、`environments/prd/` を番号付きスタックに分割して管理する。
 
+（元 `portfolio` リポジトリの `terraform/aws/` を、履歴を保った状態で分離しました。Go アプリケーションは [`golang`](https://github.com/r-fukuda-git/r-fukuda-golang) に分離済みです。）
+
 ## ディレクトリ構成
 
 | パス | 内容 |
@@ -155,8 +157,6 @@ destroy は上記の逆順。
 前提として、`make init-bootstrap` と `make init-all`（または各スタックの `make init STACK=...`）で init 済みであること。
 
 ```bash
-cd terraform/aws
-
 make apply STACK=bootstrap
 make apply STACK=00_iam
 make apply STACK=01_network

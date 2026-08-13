@@ -33,7 +33,7 @@ endif
 .PHONY: help list fmt fmt-check init init-bootstrap init-all plan apply destroy validate providers
 
 help:
-	@echo "terraform/aws — 共通変数: ENV=$(ENV)（prd スタック用） EXTRA_ARGS='...'（plan/apply/destroy に付与）"
+	@echo "共通変数: ENV=$(ENV)（prd スタック用） EXTRA_ARGS='...'（plan/apply/destroy に付与）"
 	@echo ""
 	@echo "  make list                         スタック名一覧"
 	@echo "  make fmt | make fmt-check         再帰 fmt / fmt 検査のみ"
