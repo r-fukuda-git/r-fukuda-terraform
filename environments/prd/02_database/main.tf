@@ -13,16 +13,16 @@ module "rds" {
     data.terraform_remote_state.network.outputs.subnet_private_id_1a,
     data.terraform_remote_state.network.outputs.subnet_private_id_1c
   ]
-  vpc_security_group_ids  = [module.security_group.private_sg_id]
-  instance_class          = var.instance_class
-  engine                  = var.engine
-  engine_version          = var.engine_version
-  db_name                 = var.db_name
-  username                = var.username
-  multi_az                = var.multi_az
-  deletion_protection     = var.deletion_protection
-  backup_window           = var.backup_window
-  maintenance_window      = var.maintenance_window
+  vpc_security_group_ids   = [module.security_group.private_sg_id]
+  instance_class           = var.instance_class
+  engine                   = var.engine
+  engine_version           = var.engine_version
+  db_name                  = var.db_name
+  username                 = var.username
+  multi_az                 = var.multi_az
+  deletion_protection      = var.deletion_protection
+  backup_window            = var.backup_window
+  maintenance_window       = var.maintenance_window
   backup_retention_period  = var.backup_retention_period
   skip_final_snapshot      = var.skip_final_snapshot
   delete_automated_backups = var.delete_automated_backups
