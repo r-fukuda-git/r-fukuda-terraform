@@ -1,6 +1,7 @@
-# prd / 04_compute_ecs_task — 単発 / スケジュール実行の ECS Fargate タスク定義。
+# stg / 04_compute_ecs_task — 単発 / スケジュール実行の ECS Fargate タスク定義。
 # 依存: 01_network, 00_iam, 03_ecr, 04_compute_ecs（クラスタ / SG / イメージを流用）。
 # upstream 未 apply でも plan が通るよう、各参照は try(remote_state, ライブルックアップ) にしてある。
+# modules/ecs_standalone は環境非依存。prd/04_compute_ecs_task と同型。
 data "terraform_remote_state" "network" {
   backend = "s3"
   config = merge(local.terraform_remote_state_base, {

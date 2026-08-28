@@ -1,3 +1,7 @@
+# prd / 03_ecr — ECR リポジトリ + プライベートサブネット向け VPC エンドポイント。
+# 依存: 01_network。
+# Why: private の Fargate が NAT なしで ECR pull / ログ出力できるよう VPC エンドポイントを同梱する。
+#      NAT を使うなら 01_network_nat 側で足りる。stg と違い create_vpc_endpoints トグルは持たず常時作成する。
 data "terraform_remote_state" "network" {
   backend = "s3"
   config = merge(local.terraform_remote_state_base, {

@@ -11,6 +11,7 @@ variable "terraform_state_region" {
 
 variable "terraform_state_key_prefix" {
   type        = string
+  default     = "prd"
   description = "S3 key prefix (e.g. prd). Keys are {prefix}/{stack}/terraform.tfstate"
 }
 

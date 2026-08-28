@@ -20,6 +20,12 @@ variable "main_deploy_branches" {
   default     = ["main"]
 }
 
+variable "create_oidc_provider" {
+  type        = bool
+  description = "true でこの module が OIDC プロバイダを作成する。false なら既存プロバイダを data 参照（同一アカウント内の 2 環境目向け）"
+  default     = true
+}
+
 variable "ecr_repository_arn" {
   type = string
 }
