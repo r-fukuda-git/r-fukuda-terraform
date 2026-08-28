@@ -91,3 +91,34 @@ variable "rds_parameters" {
     "long_query_time"      = "2.0"
   }
 }
+
+# 以下 5 つはエンジン非依存にするための変数。
+# Why: default は現行の MySQL 8.4 固定値と同一にし、これらを渡さない既存呼び出し
+#      （environments/prd/02_database）の plan を変えないため。
+variable "parameter_group_family" {
+  type        = string
+  default     = "mysql8.4"
+  description = "DB パラメータグループの family（例: mysql8.0 / postgres16 / mariadb10.11）"
+}
+
+variable "major_engine_version" {
+  type        = string
+  default     = "8.4"
+  description = "オプショングループの major_engine_version。MySQL/MariaDB のみ使用"
+}
+
+variable "enabled_cloudwatch_logs_exports" {
+  type        = list(string)
+  default     = ["error", "general", "slowquery"]
+  description = "CloudWatch Logs にエクスポートするログ種別。PostgreSQL は [\"postgresql\", \"upgrade\"]"
+}
+
+variable "allocated_storage" {
+  type    = number
+  default = 20
+}
+
+variable "storage_type" {
+  type    = string
+  default = "gp3"
+}
