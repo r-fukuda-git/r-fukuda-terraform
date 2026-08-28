@@ -7,7 +7,8 @@ variable "project_name" {
 }
 
 variable "route_cidr_block" {
-  type = string
+  type    = string
+  default = "0.0.0.0/0"
 }
 
 variable "availability_zone_suffix" {

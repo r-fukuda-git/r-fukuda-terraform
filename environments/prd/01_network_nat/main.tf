@@ -1,3 +1,6 @@
+# prd / 01_network_nat — プライベートサブネットに NAT Gateway 経由の egress を追加。
+# 依存: 01_network。private の Fargate が公開レジストリからイメージ取得する等で必要。
+# 03_ecr（VPC エンドポイント）と併用する必要はない（どちらか一方で足りる）。
 data "terraform_remote_state" "network" {
   backend = "s3"
   config = merge(local.terraform_remote_state_base, {

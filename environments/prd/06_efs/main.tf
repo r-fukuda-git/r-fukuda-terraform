@@ -1,3 +1,7 @@
+# prd / 06_efs — EFS + マウントターゲット + efs-sg。
+# 依存: 01_network, 02_database, 03_compute_ec2, 04_compute_ecs。
+# Why: efs-sg の ingress は database/compute の各 SG からのみ許可する（SG 間参照で最小権限）。
+#      stg のような VPC CIDR 全開放は採用しない。
 data "terraform_remote_state" "network" {
   backend = "s3"
   config = merge(local.terraform_remote_state_base, {

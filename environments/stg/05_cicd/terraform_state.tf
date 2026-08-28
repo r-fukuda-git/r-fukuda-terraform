@@ -11,8 +11,8 @@ variable "terraform_state_region" {
 
 variable "terraform_state_key_prefix" {
   type        = string
-  default     = "prd"
-  description = "S3 key prefix (e.g. prd). Keys are {prefix}/{stack}/terraform.tfstate"
+  default     = "stg"
+  description = "S3 key prefix. Keys are {prefix}/{stack}/terraform.tfstate"
 }
 
 locals {
@@ -22,6 +22,7 @@ locals {
   }
 
   terraform_state_key = {
-    network = "${var.terraform_state_key_prefix}/01_network/terraform.tfstate"
+    iam = "${var.terraform_state_key_prefix}/00_iam/terraform.tfstate"
+    ecr = "${var.terraform_state_key_prefix}/03_ecr/terraform.tfstate"
   }
 }

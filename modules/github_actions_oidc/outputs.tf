@@ -1,5 +1,5 @@
 output "oidc_provider_arn" {
-  value = aws_iam_openid_connect_provider.github_actions.arn
+  value = local.oidc_provider_arn
 }
 
 output "main_deploy_role_arn" {

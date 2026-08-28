@@ -9,8 +9,8 @@ EXTRA_ARGS ?=
 # init-all の走査順（README の apply 順に合わせる）
 STACKS := 00_iam 01_network 01_network_nat 02_database 03_compute_ec2 03_ecr 04_compute_ecs 04_compute_ecs_task 05_cicd 06_efs 07_elasticache
 
-# stg（prd と同じ番号付き独立スタック構成。05_cicd / 04_compute_ecs_task は stg では持たない）
-STACKS_STG := 00_iam 01_network 01_network_nat 02_database 03_compute_ec2 03_ecr 04_compute_ecs 06_efs 07_elasticache
+# stg（prd と同じ番号付き独立スタック構成。スタック集合も prd と同一）
+STACKS_STG := 00_iam 01_network 01_network_nat 02_database 03_compute_ec2 03_ecr 04_compute_ecs 04_compute_ecs_task 05_cicd 06_efs 07_elasticache
 
 # これらのゴールだけ STACK 必須（make 単体では MAKECMDGOALS が空になり得るためホワイトリスト方式）
 NEEDS_STACK := init plan apply destroy validate providers
@@ -47,8 +47,7 @@ help:
 	@echo "       prd: bootstrap | 00_iam | 01_network | 01_network_nat | 02_database |"
 	@echo "                03_compute_ec2 | 03_ecr | 04_compute_ecs | 04_compute_ecs_task | 05_cicd |"
 	@echo "                06_efs | 07_elasticache"
-	@echo "       stg: 00_iam | 01_network | 01_network_nat | 02_database | 03_compute_ec2 |"
-	@echo "                03_ecr | 04_compute_ecs | 06_efs | 07_elasticache"
+	@echo "       stg: prd と同じスタック名（00_iam 〜 07_elasticache、04_compute_ecs_task / 05_cicd 含む）"
 	@echo "  make providers STACK=<name> [ENV=stg]   terraform providers（ロック確認用）"
 	@echo ""
 	@echo "  例: make plan STACK=01_network ENV=stg"

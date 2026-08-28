@@ -4,13 +4,29 @@ data "aws_region" "current" {}
 locals {
   name_prefix     = "${var.project_name}-${var.env}"
   github_repo_sub = "repo:${var.github_owner}/${var.github_repository}"
+
+  # Why: OIDC プロバイダは AWS アカウント単位で 1 つしか作れない。prd で作成済みの
+  #      ものを stg など 2 つ目の環境から流用するため、create_oidc_provider=false で
+  #      data 参照に切り替える。true（既定）なら従来どおり resource を作成する。
+  oidc_provider_arn = var.create_oidc_provider ? aws_iam_openid_connect_provider.github_actions[0].arn : data.aws_iam_openid_connect_provider.existing[0].arn
+}
+
+# Why: count 追加でアドレスが [0] 付きに変わる。作成済み prd/05_cicd で
+#      state 上の provider を作り直させないための移設宣言。
+moved {
+  from = aws_iam_openid_connect_provider.github_actions
+  to   = aws_iam_openid_connect_provider.github_actions[0]
 }
 
 data "tls_certificate" "github_actions" {
+  count = var.create_oidc_provider ? 1 : 0
+
   url = "https://token.actions.githubusercontent.com/.well-known/openid-configuration"
 }
 
 resource "aws_iam_openid_connect_provider" "github_actions" {
+  count = var.create_oidc_provider ? 1 : 0
+
   url = "https://token.actions.githubusercontent.com"
 
   client_id_list = [
@@ -18,12 +34,18 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
   ]
 
   thumbprint_list = [
-    data.tls_certificate.github_actions.certificates[0].sha1_fingerprint,
+    data.tls_certificate.github_actions[0].certificates[0].sha1_fingerprint,
   ]
 
   tags = {
     Name = "${local.name_prefix}-github-actions-oidc"
   }
+}
+
+data "aws_iam_openid_connect_provider" "existing" {
+  count = var.create_oidc_provider ? 0 : 1
+
+  url = "https://token.actions.githubusercontent.com"
 }
 
 data "aws_iam_policy_document" "github_actions_main_assume" {
@@ -32,7 +54,7 @@ data "aws_iam_policy_document" "github_actions_main_assume" {
 
     principals {
       type        = "Federated"
-      identifiers = [aws_iam_openid_connect_provider.github_actions.arn]
+      identifiers = [local.oidc_provider_arn]
     }
 
     condition {

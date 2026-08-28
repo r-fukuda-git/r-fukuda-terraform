@@ -10,10 +10,11 @@ output "alb_dns_name" {
   value = module.ecs.alb_dns_name
 }
 
+# output 名は据え置き（04_compute_ecs_task / 06_efs / 07_elasticache が名前で参照しているため）。
 output "ecs_security_group_id" {
-  value = module.security_group.private_ecs_sg_id
+  value = aws_security_group.ecs.id
 }
 
 output "alb_security_group_id" {
-  value = module.security_group.alb_sg_id
+  value = aws_security_group.alb.id
 }

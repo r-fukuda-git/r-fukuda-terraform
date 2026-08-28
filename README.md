@@ -18,15 +18,21 @@
 
 `environments/stg/` は **prd と同じ番号付き独立スタック構成**。各スタックが独立した state（key は
 `stg/<stack>/terraform.tfstate`）を持ち、スタック間は `data.terraform_remote_state` で配線する。
-prd の各スタック・共有 `modules/` の既存インターフェースには一切触れない（`modules/rds` の engine 変数化のみ
-後方互換で追加済み ＝ default が現行 prd 値なので prd の plan は no-op）。
+prd 側も同じパターンに揃えてある（スタック集合・ファイル構成・SG のインライン管理が一致）。
+共有 `modules/` は後方互換の追加のみ:
+`modules/rds` の engine 変数化（default が現行 prd 値なので prd の plan は no-op）、
+`modules/github_actions_oidc` の `create_oidc_provider` フラグ（default true で従来どおり）。
 
 - **どのコンポーネントを立てるか = どのスタックを apply するか**。組み合わせは apply 順の集合で表現する（下記）。
 - **network は建てっぱなし**運用が可能。`01_network` を 1 回 apply したら、compute 系スタックだけを
   日をまたいで apply / destroy して差し替える。`01_network` の state は他スタックから参照されるだけで書き換わらない。
-- prd との違いは 2 点のみ: (1) `05_cicd` / `04_compute_ecs_task` を持たない、
-  (2) SG は各スタック内で直接管理し、データ層（RDS/EFS/ElastiCache）の ingress は VPC CIDR 許可、
-  EC2/ALB の ingress は `admin_cidr_blocks` 許可（`modules/sg` は使わない。engine 可変ポートに対応するため）。
+- prd との差分（スタック構成は同一。残る違い）:
+  1. データ層（RDS/EFS/ElastiCache）の ingress。**stg は VPC CIDR 許可**（検証用途として十分）、
+     **prd は SG 間参照**（クライアント SG からのみ許可、最小権限）。EC2/ALB の ingress は
+     stg=`admin_cidr_blocks`、prd=`source_cidr_blocks`。
+  2. VPC 帯。stg=`10.20.0.0/16`、prd=`192.168.0.0/16`（非重複）。
+  3. `03_ecr` の `create_vpc_endpoints` トグルは stg のみ。prd は VPC エンドポイントを常時作成する。
+  4. `05_cicd` は stg が `create_oidc_provider=false`（prd が作成した OIDC プロバイダを data 参照）。
 
 ### スタック一覧と依存
 
@@ -39,6 +45,8 @@ prd の各スタック・共有 `modules/` の既存インターフェースに�
 | `03_compute_ec2` | EC2（public）+ web-sg | `01_network`, `00_iam` |
 | `03_ecr` | ECR リポジトリ + VPC エンドポイント（`create_vpc_endpoints=false` で無効化可） | `01_network` |
 | `04_compute_ecs` | ECS Fargate 常駐 Service + ALB + ecs/alb-sg | `01_network`, `00_iam`, （`ecs_use_ecr=true` 時のみ）`03_ecr` |
+| `04_compute_ecs_task` | 単発 / スケジュール ECS Fargate タスク | `01_network`, `00_iam`, `03_ecr`, `04_compute_ecs` |
+| `05_cicd` | GitHub Actions OIDC デプロイロール（`create_oidc_provider=false`） | `00_iam`, `03_ecr` |
 | `06_efs` | EFS + mount target + efs-sg | `01_network` |
 | `07_elasticache` | ElastiCache（redis）+ cache-sg | `01_network` |
 
@@ -58,13 +66,19 @@ Aurora（`aws_rds_cluster`）は現状スコープ外。
 ### 使い方
 
 ```bash
-# 初回のみ：各スタックで backend.hcl / terraform.tfvars を用意
-for s in 00_iam 01_network 01_network_nat 02_database 03_compute_ec2 03_ecr 04_compute_ecs 06_efs 07_elasticache; do
-  cd environments/stg/$s
-  cp backend.hcl.example backend.hcl
-  cp terraform.tfvars.example terraform.tfvars   # admin_cidr_blocks / ec2_key_path 等を自分の値に
-  cd - >/dev/null
-done
+# 初回のみ：Git フックを有効化（*.example 混入をコミット前に弾く）
+git config core.hooksPath .githooks
+
+# 初回のみ：各スタックで backend.hcl を用意。雛形（*.example）はリポジトリに置かない。
+# environments/stg/<stack>/backend.hcl に下記をコピペし、key の <stack> をディレクトリ名に置換:
+#   bucket         = "r-fukuda-terraform-state"
+#   key            = "stg/<stack>/terraform.tfstate"
+#   region         = "ap-northeast-1"
+#   dynamodb_table = "r-fukuda-terraform-state-lock"
+#   encrypt        = true
+# terraform.tfvars も雛形を置かない。各スタックに手で作成する:
+#   env = "stg" / project_name = "<自分>" は必須。他は各スタックの variables.tf の default 参照。
+#   03_compute_ec2 は admin_cidr_blocks / ec2_key_path が必須。
 make init-all-stg          # stg 全スタックを init
 
 # スタック単位で plan / apply（リポジトリ直下で。ENV=stg を付ける）
@@ -84,9 +98,13 @@ make destroy STACK=03_compute_ec2 ENV=stg
 | EC2 + RDS | `01_network` → `00_iam` → `03_compute_ec2` → `02_database` |
 | ECS（公開イメージ）+ ALB | `01_network` → `00_iam` → `03_ecr`（エンドポイント用）→ `04_compute_ecs` |
 | ECS（ECR イメージ）+ RDS | `01_network` → `00_iam` → `03_ecr` → `04_compute_ecs`（`ecs_use_ecr=true`）→ `02_database` |
-| 全部入り | `01_network` → `00_iam` → `01_network_nat` → `02_database` → `03_compute_ec2` → `03_ecr` → `04_compute_ecs` → `06_efs` → `07_elasticache` |
+| 全部入り | `01_network` → `00_iam` → `01_network_nat` → `02_database` → `03_compute_ec2` → `03_ecr` → `04_compute_ecs` → `04_compute_ecs_task` → `05_cicd` → `06_efs` → `07_elasticache` |
 
-各スタックの `terraform.tfvars` と `backend.hcl` は `.gitignore` 済み（`*.example` を複製して使う）。
+各スタックの `terraform.tfvars` と `backend.hcl` は `.gitignore` 済み。どちらもリポジトリに雛形（`*.example`）を置かない方針で、`backend.hcl` は「使い方」のテンプレート、`terraform.tfvars` は `variables.tf` の `description` / `default` を見て各自で作成する。`*.example` ファイルの追加は pre-commit フック（`.githooks/pre-commit`）と CI（`.github/workflows/guard.yml`）で禁止している。
+
+### prd / stg のパリティ
+
+`environments/prd/<stack>` と `environments/stg/<stack>` の `.tf` は同一に保つ（env 差は `backend.hcl` と `terraform.tfvars` のみ）。CI の `parity` ジョブが両者を `diff` し、差異があれば失敗する。まだ揃っていないファイルは `.parity-exceptions` に列挙して一時的に除外し、揃えるたびに行を削る。除外リストが空になったら完全パリティ達成。
 
 ## AWS 構成図（prd）
 
@@ -265,12 +283,12 @@ Terraform 変数は `snake_case` に統一する。AWS API が camelCase を要�
 |------------|------|
 | `networking` | VPC、サブネット、IGW、ルート |
 | `nat_gateway` | NAT Gateway、プライベート RT へのデフォルトルート |
-| `sg` | EC2/RDS 用 web・db SG、ECS/ALB 用 SG |
+| `sg` | （未使用）EC2/RDS 用 web・db SG、ECS/ALB 用 SG。prd/stg とも各スタックで SG をインライン管理するようになり参照されていない |
 | `iam` | EC2 インスタンスプロファイル、ECS タスク実行ロール |
 | `ec2` | EC2 インスタンス |
 | `ecs` | ECS クラスター、Fargate サービス、ALB、スタンドアロンタスク |
 | `rds` | RDS（engine 可変: mysql / mariadb / postgres。family・ログ種別・オプショングループ有無を変数化） |
 | `ecr` | ECR リポジトリ（`03_ecr` スタック） |
 | `vpc_endpoints_ecs` | プライベートサブネット向け ECR / Logs / ECS / S3 VPC Endpoint（`03_ecr` スタック） |
-| `github_actions_oidc` | GitHub Actions からの OIDC 連携 IAM（`05_cicd` スタック） |
+| `github_actions_oidc` | GitHub Actions からの OIDC 連携 IAM（`05_cicd` スタック）。`create_oidc_provider`（default true）で OIDC プロバイダの新規作成 / 既存 data 参照を切替 |
 | `eip` | Elastic IP（未接続） |

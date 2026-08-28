@@ -1,0 +1,53 @@
+# prd / stg でまだ一致していない .tf ファイル（<stack>/<file> 形式、# はコメント）。
+# CI の parity ジョブはここに載っているパスの差分を許容する。
+# パリティ作業で prd と stg を揃えたら、その行を削除すること。空になれば完全パリティ達成。
+#
+# terraform_state.tf 群は variable "terraform_state_key_prefix" の default が prd/stg で
+# 異なるだけ。default を消して terraform.tfvars 必須にすれば解消できる（それまでは除外）。
+
+00_iam/main.tf
+
+01_network/main.tf
+01_network/outputs.tf
+01_network/variables.tf
+
+01_network_nat/main.tf
+01_network_nat/terraform_state.tf
+01_network_nat/variables.tf
+
+02_database/locals.tf
+02_database/main.tf
+02_database/outputs.tf
+02_database/terraform_state.tf
+02_database/variables.tf
+
+03_compute_ec2/main.tf
+03_compute_ec2/outputs.tf
+03_compute_ec2/terraform_state.tf
+03_compute_ec2/variables.tf
+
+03_ecr/main.tf
+03_ecr/outputs.tf
+03_ecr/terraform_state.tf
+03_ecr/variables.tf
+
+04_compute_ecs/main.tf
+04_compute_ecs/outputs.tf
+04_compute_ecs/terraform_state.tf
+04_compute_ecs/variables.tf
+
+04_compute_ecs_task/main.tf
+04_compute_ecs_task/terraform_state.tf
+
+05_cicd/main.tf
+05_cicd/terraform_state.tf
+
+06_efs/main.tf
+06_efs/outputs.tf
+06_efs/terraform_state.tf
+06_efs/variables.tf
+
+07_elasticache/main.tf
+07_elasticache/outputs.tf
+07_elasticache/terraform_state.tf
+07_elasticache/variables.tf

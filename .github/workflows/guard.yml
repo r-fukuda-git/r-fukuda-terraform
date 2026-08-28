@@ -1,0 +1,24 @@
+name: guard
+
+# リポジトリ運用ルールの番人:
+#   - *.example ファイルの混入を禁止
+#   - environments/prd/<stack> と environments/stg/<stack> の .tf を同一に保つ
+#     （未達分は .parity-exceptions で明示的に除外）
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  no-example:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/check-no-example.sh
+
+  parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/check-parity.sh
