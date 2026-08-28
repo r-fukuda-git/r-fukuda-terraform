@@ -12,6 +12,13 @@ variable "instance_class" {
 
 variable "engine" {
   type = string
+
+  # Why: option_group の count は contains(["mysql","mariadb"], var.engine) で判定するため、
+  #      "MySQL" のような大文字や未対応値だと静かに count=0 になる。plan 時点で弾く。
+  validation {
+    condition     = contains(["mysql", "mariadb", "postgres"], var.engine)
+    error_message = "engine は小文字で mysql / mariadb / postgres のいずれかを指定する。"
+  }
 }
 
 variable "engine_version" {
