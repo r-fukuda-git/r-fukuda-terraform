@@ -58,13 +58,15 @@ Aurora（`aws_rds_cluster`）は現状スコープ外。
 ### 使い方
 
 ```bash
-# 初回のみ：各スタックで backend.hcl / terraform.tfvars を用意
+# 初回のみ：各スタックで backend.hcl を用意
 for s in 00_iam 01_network 01_network_nat 02_database 03_compute_ec2 03_ecr 04_compute_ecs 06_efs 07_elasticache; do
   cd environments/stg/$s
   cp backend.hcl.example backend.hcl
-  cp terraform.tfvars.example terraform.tfvars   # admin_cidr_blocks / ec2_key_path 等を自分の値に
   cd - >/dev/null
 done
+# terraform.tfvars は prd と同様リポジトリに雛形を置かない。各スタックに手で作成する:
+#   env = "stg" / project_name = "<自分>" は必須。他は各スタックの variables.tf の default 参照。
+#   03_compute_ec2 は admin_cidr_blocks / ec2_key_path が必須。
 make init-all-stg          # stg 全スタックを init
 
 # スタック単位で plan / apply（リポジトリ直下で。ENV=stg を付ける）
@@ -86,7 +88,7 @@ make destroy STACK=03_compute_ec2 ENV=stg
 | ECS（ECR イメージ）+ RDS | `01_network` → `00_iam` → `03_ecr` → `04_compute_ecs`（`ecs_use_ecr=true`）→ `02_database` |
 | 全部入り | `01_network` → `00_iam` → `01_network_nat` → `02_database` → `03_compute_ec2` → `03_ecr` → `04_compute_ecs` → `06_efs` → `07_elasticache` |
 
-各スタックの `terraform.tfvars` と `backend.hcl` は `.gitignore` 済み（`*.example` を複製して使う）。
+各スタックの `terraform.tfvars` と `backend.hcl` は `.gitignore` 済み。`backend.hcl` は `backend.hcl.example` を複製して使う。`terraform.tfvars` は prd と同様、リポジトリに雛形を置かず各自で作成する。
 
 ## AWS 構成図（prd）
 
