@@ -1,0 +1,18 @@
+# cp terraform.tfvars.example terraform.tfvars して使う（terraform.tfvars は .gitignore 済み）
+env          = "stg"
+project_name = "r-fukuda"
+
+admin_cidr_blocks = ["203.0.113.10/32"]
+
+# 公開 nginx イメージを使う場合（03_ecr 不要）
+ecs_use_ecr    = false
+ecs_image_repo = "public.ecr.aws/nginx/nginx"
+ecs_image_tag  = "latest"
+
+# 03_ecr に push 済みのイメージを使う場合は ecs_use_ecr = true にして 03_ecr を先に apply
+
+ecs_container_port = 80
+ecs_desired_count  = 1
+
+terraform_state_bucket     = "r-fukuda-terraform-state"
+terraform_state_key_prefix = "stg"

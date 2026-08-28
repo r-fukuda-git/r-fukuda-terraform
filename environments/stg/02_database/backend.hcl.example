@@ -1,0 +1,5 @@
+bucket         = "r-fukuda-terraform-state"
+key            = "stg/02_database/terraform.tfstate"
+region         = "ap-northeast-1"
+dynamodb_table = "r-fukuda-terraform-state-lock"
+encrypt        = true

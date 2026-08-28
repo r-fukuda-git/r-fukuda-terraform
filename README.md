@@ -11,6 +11,82 @@
 | `bootstrap/` | リモートステート用 S3 バケット・DynamoDB ロックテーブル（初回のみ） |
 | `modules/` | 再利用モジュール（VPC、SG、EC2、ECS、RDS、IAM、CI/CD など） |
 | `environments/prd/` | 本番想定スタック（スタックごとに独立した state） |
+| `environments/stg/` | 検証用スタック（prd と同じ番号付き独立スタック構成。state key は `stg/<stack>/...`） |
+| `environments/_archive_stg_singleroot/` | 旧・単一 root 版 stg（`.gitignore` 済み。復元用に保持のみ） |
+
+## 検証環境 (stg)
+
+`environments/stg/` は **prd と同じ番号付き独立スタック構成**。各スタックが独立した state（key は
+`stg/<stack>/terraform.tfstate`）を持ち、スタック間は `data.terraform_remote_state` で配線する。
+prd の各スタック・共有 `modules/` の既存インターフェースには一切触れない（`modules/rds` の engine 変数化のみ
+後方互換で追加済み ＝ default が現行 prd 値なので prd の plan は no-op）。
+
+- **どのコンポーネントを立てるか = どのスタックを apply するか**。組み合わせは apply 順の集合で表現する（下記）。
+- **network は建てっぱなし**運用が可能。`01_network` を 1 回 apply したら、compute 系スタックだけを
+  日をまたいで apply / destroy して差し替える。`01_network` の state は他スタックから参照されるだけで書き換わらない。
+- prd との違いは 2 点のみ: (1) `05_cicd` / `04_compute_ecs_task` を持たない、
+  (2) SG は各スタック内で直接管理し、データ層（RDS/EFS/ElastiCache）の ingress は VPC CIDR 許可、
+  EC2/ALB の ingress は `admin_cidr_blocks` 許可（`modules/sg` は使わない。engine 可変ポートに対応するため）。
+
+### スタック一覧と依存
+
+| スタック | 立てるもの | 依存（remote_state） |
+|----------|-----------|----------------------|
+| `00_iam` | EC2 インスタンスプロファイル / ECS タスクロール | なし |
+| `01_network` | stg 専用 VPC（`10.20.0.0/16`）/ サブネット / IGW | なし |
+| `01_network_nat` | NAT Gateway + private デフォルトルート | `01_network` |
+| `02_database` | RDS（engine 自由指定）+ db-sg | `01_network` |
+| `03_compute_ec2` | EC2（public）+ web-sg | `01_network`, `00_iam` |
+| `03_ecr` | ECR リポジトリ + VPC エンドポイント（`create_vpc_endpoints=false` で無効化可） | `01_network` |
+| `04_compute_ecs` | ECS Fargate 常駐 Service + ALB + ecs/alb-sg | `01_network`, `00_iam`, （`ecs_use_ecr=true` 時のみ）`03_ecr` |
+| `06_efs` | EFS + mount target + efs-sg | `01_network` |
+| `07_elasticache` | ElastiCache（redis）+ cache-sg | `01_network` |
+
+private サブネットの Fargate がイメージを取得するには、`01_network_nat` か `03_ecr`（VPC エンドポイント）の
+どちらかを併用する。
+
+### RDS の engine 自由指定（`02_database`）
+
+`rds_engine` に `mysql` / `mariadb` / `postgres` を指定。`rds_engine_version` /
+`rds_parameter_group_family` / `rds_major_engine_version` /
+`rds_enabled_cloudwatch_logs_exports` / `rds_parameters` は未指定なら
+engine ごとの既定（`environments/stg/02_database/locals.tf` の `rds_engine_defaults`）から解決する。
+db-sg の ingress ポートも engine 既定（MySQL/MariaDB=3306, PostgreSQL=5432）に自動追従する。
+PostgreSQL のときオプショングループは作らない（`modules/rds` 側で `count` 制御）。
+Aurora（`aws_rds_cluster`）は現状スコープ外。
+
+### 使い方
+
+```bash
+# 初回のみ：各スタックで backend.hcl / terraform.tfvars を用意
+for s in 00_iam 01_network 01_network_nat 02_database 03_compute_ec2 03_ecr 04_compute_ecs 06_efs 07_elasticache; do
+  cd environments/stg/$s
+  cp backend.hcl.example backend.hcl
+  cp terraform.tfvars.example terraform.tfvars   # admin_cidr_blocks / ec2_key_path 等を自分の値に
+  cd - >/dev/null
+done
+make init-all-stg          # stg 全スタックを init
+
+# スタック単位で plan / apply（リポジトリ直下で。ENV=stg を付ける）
+make plan  STACK=01_network ENV=stg
+make apply STACK=01_network ENV=stg
+make destroy STACK=03_compute_ec2 ENV=stg
+```
+
+### apply 順（シナリオ別）
+
+`destroy` は逆順。`01_network`（+ 必要なら `00_iam`）は建てっぱなしにして compute 側だけ差し替えてよい。
+
+| シナリオ | apply する順 |
+|----------|--------------|
+| EC2 のみ | `01_network` → `00_iam` → `03_compute_ec2` |
+| RDS のみ（例: postgres） | `01_network` → `02_database` |
+| EC2 + RDS | `01_network` → `00_iam` → `03_compute_ec2` → `02_database` |
+| ECS（公開イメージ）+ ALB | `01_network` → `00_iam` → `03_ecr`（エンドポイント用）→ `04_compute_ecs` |
+| ECS（ECR イメージ）+ RDS | `01_network` → `00_iam` → `03_ecr` → `04_compute_ecs`（`ecs_use_ecr=true`）→ `02_database` |
+| 全部入り | `01_network` → `00_iam` → `01_network_nat` → `02_database` → `03_compute_ec2` → `03_ecr` → `04_compute_ecs` → `06_efs` → `07_elasticache` |
+
+各スタックの `terraform.tfvars` と `backend.hcl` は `.gitignore` 済み（`*.example` を複製して使う）。
 
 ## AWS 構成図（prd）
 
@@ -193,7 +269,7 @@ Terraform 変数は `snake_case` に統一する。AWS API が camelCase を要�
 | `iam` | EC2 インスタンスプロファイル、ECS タスク実行ロール |
 | `ec2` | EC2 インスタンス |
 | `ecs` | ECS クラスター、Fargate サービス、ALB、スタンドアロンタスク |
-| `rds` | RDS PostgreSQL |
+| `rds` | RDS（engine 可変: mysql / mariadb / postgres。family・ログ種別・オプショングループ有無を変数化） |
 | `ecr` | ECR リポジトリ（`03_ecr` スタック） |
 | `vpc_endpoints_ecs` | プライベートサブネット向け ECR / Logs / ECS / S3 VPC Endpoint（`03_ecr` スタック） |
 | `github_actions_oidc` | GitHub Actions からの OIDC 連携 IAM（`05_cicd` スタック） |
