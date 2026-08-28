@@ -9,6 +9,9 @@ EXTRA_ARGS ?=
 # init-all の走査順（README の apply 順に合わせる）
 STACKS := 00_iam 01_network 01_network_nat 02_database 03_compute_ec2 03_ecr 04_compute_ecs 04_compute_ecs_task 05_cicd 06_efs 07_elasticache
 
+# stg（prd と同じ番号付き独立スタック構成。05_cicd / 04_compute_ecs_task は stg では持たない）
+STACKS_STG := 00_iam 01_network 01_network_nat 02_database 03_compute_ec2 03_ecr 04_compute_ecs 06_efs 07_elasticache
+
 # これらのゴールだけ STACK 必須（make 単体では MAKECMDGOALS が空になり得るためホワイトリスト方式）
 NEEDS_STACK := init plan apply destroy validate providers
 
@@ -30,24 +33,33 @@ endif
 
 .DEFAULT_GOAL := help
 
-.PHONY: help list fmt fmt-check init init-bootstrap init-all plan apply destroy validate providers
+.PHONY: help list fmt fmt-check init init-bootstrap init-all init-all-stg plan apply destroy validate providers
 
 help:
-	@echo "共通変数: ENV=$(ENV)（prd スタック用） EXTRA_ARGS='...'（plan/apply/destroy に付与）"
+	@echo "共通変数: ENV=$(ENV)（prd / stg を切替） EXTRA_ARGS='...'（plan/apply/destroy に付与）"
 	@echo ""
-	@echo "  make list                         スタック名一覧"
+	@echo "  make list                         スタック名一覧（prd / stg）"
 	@echo "  make fmt | make fmt-check         再帰 fmt / fmt 検査のみ"
 	@echo "  make init-bootstrap               bootstrap のみ init（backend.hcl なし）"
 	@echo "  make init-all                     bootstrap 後に prd 全スタックを順に init"
-	@echo "  make init|plan|apply|destroy|validate STACK=<name>"
-	@echo "       STACK=bootstrap | 00_iam | 01_network | 01_network_nat | 02_database |"
+	@echo "  make init-all-stg                 stg 全スタックを順に init"
+	@echo "  make init|plan|apply|destroy|validate STACK=<name> [ENV=prd|stg]"
+	@echo "       prd: bootstrap | 00_iam | 01_network | 01_network_nat | 02_database |"
 	@echo "                03_compute_ec2 | 03_ecr | 04_compute_ecs | 04_compute_ecs_task | 05_cicd |"
 	@echo "                06_efs | 07_elasticache"
-	@echo "  make providers STACK=<name>      terraform providers（ロック確認用）"
+	@echo "       stg: 00_iam | 01_network | 01_network_nat | 02_database | 03_compute_ec2 |"
+	@echo "                03_ecr | 04_compute_ecs | 06_efs | 07_elasticache"
+	@echo "  make providers STACK=<name> [ENV=stg]   terraform providers（ロック確認用）"
+	@echo ""
+	@echo "  例: make plan STACK=01_network ENV=stg"
+	@echo "      apply 順序は README「検証環境 (stg)」を参照"
 
 list:
+	@echo "-- prd --"
 	@echo bootstrap
 	@echo $(STACKS) | tr ' ' '\n'
+	@echo "-- stg --"
+	@echo $(STACKS_STG) | tr ' ' '\n'
 
 fmt:
 	cd "$(ROOT)" && terraform fmt -recursive
@@ -60,6 +72,9 @@ init-bootstrap:
 
 init-all: init-bootstrap
 	@set -e; for s in $(STACKS); do $(MAKE) init STACK=$$s EXTRA_ARGS="$(EXTRA_ARGS)"; done
+
+init-all-stg:
+	@set -e; for s in $(STACKS_STG); do $(MAKE) init STACK=$$s ENV=stg EXTRA_ARGS="$(EXTRA_ARGS)"; done
 
 init:
 	cd "$(TF_DIR)" && terraform init $(TF_INIT_BACKEND) $(EXTRA_ARGS)

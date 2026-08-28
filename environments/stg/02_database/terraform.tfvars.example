@@ -1,0 +1,13 @@
+# cp terraform.tfvars.example terraform.tfvars して使う（terraform.tfvars は .gitignore 済み）
+env          = "stg"
+project_name = "r-fukuda"
+
+# engine は mysql / mariadb / postgres。version・family・ログ種別は未指定なら
+# locals.tf の engine 既定から解決する。
+rds_engine         = "postgres"
+rds_engine_version = "16"
+rds_instance_class = "db.t3.micro"
+rds_db_name        = "appdb"
+
+terraform_state_bucket     = "r-fukuda-terraform-state"
+terraform_state_key_prefix = "stg"

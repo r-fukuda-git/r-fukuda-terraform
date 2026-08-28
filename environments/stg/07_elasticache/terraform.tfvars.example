@@ -1,0 +1,10 @@
+# cp terraform.tfvars.example terraform.tfvars して使う（terraform.tfvars は .gitignore 済み）
+env          = "stg"
+project_name = "r-fukuda"
+
+elasticache_engine         = "redis"
+elasticache_engine_version = "7.1"
+elasticache_node_type      = "cache.t4g.micro"
+
+terraform_state_bucket     = "r-fukuda-terraform-state"
+terraform_state_key_prefix = "stg"

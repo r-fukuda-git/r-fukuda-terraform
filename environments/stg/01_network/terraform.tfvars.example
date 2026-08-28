@@ -1,0 +1,11 @@
+# cp terraform.tfvars.example terraform.tfvars して使う（terraform.tfvars は .gitignore 済み）
+env          = "stg"
+project_name = "r-fukuda"
+
+# 既定で 10.20.0.0/16。prd(192.168.0.0/16) と重ならなければ変更可
+cidr_block_vpc    = "10.20.0.0/16"
+public_subnet_1a  = "10.20.1.0/24"
+public_subnet_1c  = "10.20.2.0/24"
+private_subnet_1a = "10.20.3.0/24"
+private_subnet_1c = "10.20.4.0/24"
+route_cidr_block  = "0.0.0.0/0"

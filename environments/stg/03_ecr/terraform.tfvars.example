@@ -1,0 +1,9 @@
+# cp terraform.tfvars.example terraform.tfvars して使う（terraform.tfvars は .gitignore 済み）
+env          = "stg"
+project_name = "r-fukuda"
+
+repository_suffix    = "app"
+create_vpc_endpoints = true
+
+terraform_state_bucket     = "r-fukuda-terraform-state"
+terraform_state_key_prefix = "stg"
