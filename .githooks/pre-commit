@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Why: env ごとの雛形（*.example）はドリフトの温床になるため、リポジトリに置かない方針。
+#      backend.hcl / terraform.tfvars の書き方は README「使い方」と variables.tf に集約する。
+#      同じチェックを CI（.github/workflows/guard.yml）でも二重に掛けている。
+set -euo pipefail
+
+staged_examples="$(git diff --cached --name-only --diff-filter=AM | grep -E '\.example$' || true)"
+
+if [ -n "${staged_examples}" ]; then
+  echo "pre-commit: *.example ファイルはコミットできません（このリポジトリでは禁止）:" >&2
+  echo "${staged_examples}" | sed 's/^/  - /' >&2
+  echo "backend.hcl / terraform.tfvars の雛形は README「使い方」と各スタックの variables.tf を参照してください。" >&2
+  exit 1
+fi

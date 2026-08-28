@@ -1,3 +1,0 @@
-# cp terraform.tfvars.example terraform.tfvars して使う（terraform.tfvars は .gitignore 済み）
-env          = "stg"
-project_name = "r-fukuda"

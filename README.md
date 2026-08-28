@@ -66,13 +66,17 @@ Aurora（`aws_rds_cluster`）は現状スコープ外。
 ### 使い方
 
 ```bash
-# 初回のみ：各スタックで backend.hcl を用意
-for s in 00_iam 01_network 01_network_nat 02_database 03_compute_ec2 03_ecr 04_compute_ecs 06_efs 07_elasticache; do
-  cd environments/stg/$s
-  cp backend.hcl.example backend.hcl
-  cd - >/dev/null
-done
-# terraform.tfvars は prd と同様リポジトリに雛形を置かない。各スタックに手で作成する:
+# 初回のみ：Git フックを有効化（*.example 混入をコミット前に弾く）
+git config core.hooksPath .githooks
+
+# 初回のみ：各スタックで backend.hcl を用意。雛形（*.example）はリポジトリに置かない。
+# environments/stg/<stack>/backend.hcl に下記をコピペし、key の <stack> をディレクトリ名に置換:
+#   bucket         = "r-fukuda-terraform-state"
+#   key            = "stg/<stack>/terraform.tfstate"
+#   region         = "ap-northeast-1"
+#   dynamodb_table = "r-fukuda-terraform-state-lock"
+#   encrypt        = true
+# terraform.tfvars も雛形を置かない。各スタックに手で作成する:
 #   env = "stg" / project_name = "<自分>" は必須。他は各スタックの variables.tf の default 参照。
 #   03_compute_ec2 は admin_cidr_blocks / ec2_key_path が必須。
 make init-all-stg          # stg 全スタックを init
@@ -96,7 +100,11 @@ make destroy STACK=03_compute_ec2 ENV=stg
 | ECS（ECR イメージ）+ RDS | `01_network` → `00_iam` → `03_ecr` → `04_compute_ecs`（`ecs_use_ecr=true`）→ `02_database` |
 | 全部入り | `01_network` → `00_iam` → `01_network_nat` → `02_database` → `03_compute_ec2` → `03_ecr` → `04_compute_ecs` → `04_compute_ecs_task` → `05_cicd` → `06_efs` → `07_elasticache` |
 
-各スタックの `terraform.tfvars` と `backend.hcl` は `.gitignore` 済み。`backend.hcl` は `backend.hcl.example` を複製して使う。`terraform.tfvars` は prd と同様、リポジトリに雛形を置かず各自で作成する。
+各スタックの `terraform.tfvars` と `backend.hcl` は `.gitignore` 済み。どちらもリポジトリに雛形（`*.example`）を置かない方針で、`backend.hcl` は「使い方」のテンプレート、`terraform.tfvars` は `variables.tf` の `description` / `default` を見て各自で作成する。`*.example` ファイルの追加は pre-commit フック（`.githooks/pre-commit`）と CI（`.github/workflows/guard.yml`）で禁止している。
+
+### prd / stg のパリティ
+
+`environments/prd/<stack>` と `environments/stg/<stack>` の `.tf` は同一に保つ（env 差は `backend.hcl` と `terraform.tfvars` のみ）。CI の `parity` ジョブが両者を `diff` し、差異があれば失敗する。まだ揃っていないファイルは `.parity-exceptions` に列挙して一時的に除外し、揃えるたびに行を削る。除外リストが空になったら完全パリティ達成。
 
 ## AWS 構成図（prd）
 
